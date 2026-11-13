@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DocPulse - Espace de Dépôt Client</title>
+    <title>DocPulse - Tableau de Bord Entreprise</title>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -28,7 +28,7 @@
         h2 {
             color: #1a202c;
             font-size: 24px;
-            margin-bottom: 6px;
+            margin-bottom: 8px;
             text-align: center;
         }
         p.subtitle {
@@ -37,34 +37,35 @@
             text-align: center;
             margin-bottom: 24px;
         }
-        .info-box {
-            background: #ebf8ff;
-            border: 1px solid #bee3f8;
-            color: #2b6cb0;
-            padding: 12px 16px;
-            border-radius: 8px;
-            font-size: 13px;
-            margin-bottom: 20px;
-            text-align: center;
-        }
-        .doc-item {
-            background: #f7fafc;
-            border: 1px solid #e2e8f0;
-            padding: 14px;
-            border-radius: 8px;
-            margin-bottom: 14px;
+        .form-group {
+            margin-bottom: 18px;
         }
         label {
             display: block;
             font-size: 13px;
             font-weight: 600;
             color: #2d3748;
-            margin-bottom: 8px;
+            margin-bottom: 6px;
         }
-        input[type="file"] {
+        input[type="text"], input[type="email"] {
             width: 100%;
-            font-size: 13px;
-            color: #4a5568;
+            padding: 10px 12px;
+            border: 1px solid #cbd5e0;
+            border-radius: 8px;
+            font-size: 14px;
+            box-sizing: border-box;
+            background-color: #fff;
+        }
+        input:focus {
+            outline: none;
+            border-color: #3182ce;
+            box-shadow: 0 0 0 3px rgba(49, 130, 206, 0.1);
+        }
+        small {
+            display: block;
+            color: #718096;
+            font-size: 12px;
+            margin-top: 4px;
         }
         button {
             width: 100%;
@@ -82,27 +83,28 @@
         button:hover {
             background-color: #2b6cb0;
         }
-        button:disabled {
-            background-color: #cbd5e0;
-            cursor: not-allowed;
-        }
-        .status-message {
-            margin-top: 15px;
-            padding: 12px;
+        .result-box {
+            margin-top: 20px;
+            padding: 14px;
+            background: #f7fafc;
+            border: 1px solid #e2e8f0;
             border-radius: 8px;
-            text-align: center;
-            font-size: 14px;
             display: none;
         }
-        .success {
-            background-color: #def7ec;
-            color: #03543f;
-            border: 1px solid #bcf0da;
+        .result-box p {
+            margin: 0 0 8px 0;
+            font-size: 13px;
+            font-weight: 600;
+            color: #2d3748;
         }
-        .error {
-            background-color: #fde8e8;
-            color: #9b1c1c;
-            border: 1px solid #fbd5d5;
+        .result-box a {
+            color: #3182ce;
+            font-size: 13px;
+            word-break: break-all;
+            text-decoration: none;
+        }
+        .result-box a:hover {
+            text-decoration: underline;
         }
     </style>
 </head>
@@ -110,129 +112,80 @@
 
     <div class="card">
         <h2>DocPulse</h2>
-        <p class="subtitle">Transmission sécurisée de documents</p>
-
-        <div class="info-box" id="loadingInfo">
-            Chargement de votre demande en cours...
-        </div>
-
-        <form id="uploadForm" style="display: none;">
-            <div id="dynamicFields">
-                <!-- Les champs de documents s'afficheront dynamiquement ici -->
+        <p class="subtitle">Configuration et génération du lien magique de collecte</p>
+        
+        <form id="adminForm">
+            <div class="form-group">
+                <label>Nom de l'entreprise</label>
+                <input type="text" id="companyName" placeholder="Ex: Alabi SARL" required>
             </div>
 
-            <button type="submit" id="submitBtn">Envoyer les documents</button>
+            <div class="form-group">
+                <label>Nom du client</label>
+                <input type="text" id="recipientName" placeholder="Ex: ADJOVI Crévis" required>
+            </div>
+
+            <div class="form-group">
+                <label>E-mail de l'entreprise (où recevoir les documents)</label>
+                <input type="email" id="recipientEmail" placeholder="Ex: contact@entreprise.com" required>
+            </div>
+
+            <div class="form-group">
+                <label>Documents demandés (séparés par des virgules)</label>
+                <input type="text" id="requestedDocs" value="Pièce d'identité (CNI), Contrat signé, Justificatif de domicile, Acte de naissance" required>
+                <small>Le client verra précisément ces champs sur son interface mobile/web.</small>
+            </div>
+
+            <button type="submit">Générer le lien magique</button>
         </form>
 
-        <div id="statusMessage" class="status-message"></div>
+        <div class="result-box" id="resultBox">
+            <p>Lien magique à envoyer au client :</p>
+            <a id="magicLink" href="#" target="_blank"></a>
+        </div>
     </div>
 
     <script>
         const API_URL = 'http://localhost:5001';
-        
-        // Récupérer le token depuis l'URL (ex: index.html?token=xyz)
-        const urlParams = new URLSearchParams(window.location.search);
-        const token = urlParams.get('token');
+        const adminForm = document.getElementById('adminForm');
+        const resultBox = document.getElementById('resultBox');
+        const magicLink = document.getElementById('magicLink');
 
-        const loadingInfo = document.getElementById('loadingInfo');
-        const uploadForm = document.getElementById('uploadForm');
-        const dynamicFields = document.getElementById('dynamicFields');
-        const statusMessage = document.getElementById('statusMessage');
-
-        async function initClientPage() {
-            if (!token) {
-                loadingInfo.className = "info-box error";
-                loadingInfo.textContent = "Lien magique invalide ou manquant.";
-                return;
-            }
-
-            try {
-                // Interroger le backend pour récupérer les infos de la demande
-                const response = await fetch(`${API_URL}/api/request/${token}`);
-                const result = await response.json();
-
-                if (result.success) {
-                    const data = result.data;
-                    
-                    loadingInfo.innerHTML = `Demande de <strong>${data.company_id}</strong> pour <strong>${data.recipient_name}</strong>`;
-                    loadingInfo.className = "info-box";
-
-                    // Découper la liste des documents (séparés par des virgules dans template_id)
-                    const docsList = data.template_id ? data.template_id.split(',').map(d => d.trim()) : ["Document général"];
-
-                    // Générer dynamiquement un input file pour chaque document exigé
-                    dynamicFields.innerHTML = '';
-                    docsList.forEach((docName, index) => {
-                        const div = document.createElement('div');
-                        div.className = 'doc-item';
-                        div.innerHTML = `
-                            <label>${docName}</label>
-                            <input type="file" name="file_${index}" data-doctype="${docName}" required>
-                        `;
-                        dynamicFields.appendChild(div);
-                    });
-
-                    uploadForm.style.display = 'block';
-                } else {
-                    loadingInfo.className = "info-box error";
-                    loadingInfo.textContent = result.error || "Ce lien est invalide ou a expiré.";
-                }
-            } catch (err) {
-                console.error(err);
-                loadingInfo.className = "info-box error";
-                loadingInfo.textContent = "Impossible de contacter le serveur backend sur le port 5001.";
-            }
-        }
-
-        // Gestion de l'envoi des documents
-        uploadForm.addEventListener('submit', async (e) => {
+        adminForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             
-            const submitBtn = document.getElementById('submitBtn');
-            submitBtn.disabled = true;
-            submitBtn.textContent = "Envoi en cours...";
-
-            const formData = new FormData();
-            const fileInputs = dynamicFields.querySelectorAll('input[type="file"]');
-
-            // Ajouter tous les fichiers sélectionnés au FormData
-            fileInputs.forEach(input => {
-                if (input.files[0]) {
-                    formData.append('document', input.files[0]);
-                }
-            });
+            const companyName = document.getElementById('companyName').value;
+            const recipientName = document.getElementById('recipientName').value;
+            const recipientEmail = document.getElementById('recipientEmail').value;
+            const requestedDocs = document.getElementById('requestedDocs').value;
 
             try {
-                const response = await fetch(`${API_URL}/api/upload/${token}`, {
+                const response = await fetch(`${API_URL}/api/requests`, {
                     method: 'POST',
-                    body: formData // Pas de Content-Type en header avec FormData, le navigateur le gère pour les fichiers
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        companyId: companyName, 
+                        recipientName, 
+                        recipientEmail, 
+                        requestedDocs 
+                    })
                 });
 
                 const result = await response.json();
 
-                statusMessage.style.display = 'block';
                 if (result.success) {
-                    statusMessage.className = "status-message success";
-                    statusMessage.textContent = result.message || "Documents envoyés avec succès à l'entreprise !";
-                    uploadForm.style.display = 'none';
+                    const link = result.data.magicLink;
+                    magicLink.href = link;
+                    magicLink.textContent = link;
+                    resultBox.style.display = 'block';
                 } else {
-                    statusMessage.className = "status-message error";
-                    statusMessage.textContent = result.error || "Erreur lors de l'envoi.";
-                    submitBtn.disabled = false;
-                    submitBtn.textContent = "Envoyer les documents";
+                    alert("Erreur : " + (result.error || "Impossible de générer le lien."));
                 }
             } catch (err) {
                 console.error(err);
-                statusMessage.style.display = 'block';
-                statusMessage.className = "status-message error";
-                statusMessage.textContent = "Erreur de connexion réseau avec le serveur.";
-                submitBtn.disabled = false;
-                submitBtn.textContent = "Envoyer les documents";
+                alert("Erreur de connexion au serveur backend sur le port 5001.");
             }
         });
-
-        // Lancement au chargement de la page
-        initClientPage();
     </script>
 </body>
 </html>
