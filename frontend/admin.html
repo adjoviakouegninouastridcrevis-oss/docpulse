@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DocPulse - Tableau de Bord Entreprise</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f4f6f9;
+            margin: 0;
+            padding: 30px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            box-sizing: border-box;
+        }
+        .card {
+            background: white;
+            padding: 30px;
+            border-radius: 16px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+            width: 100%;
+            max-width: 550px;
+            box-sizing: border-box;
+        }
+        h2 {
+            color: #1a202c;
+            font-size: 24px;
+            margin-bottom: 8px;
+            text-align: center;
+        }
+        p.subtitle {
+            color: #718096;
+            font-size: 14px;
+            text-align: center;
+            margin-bottom: 24px;
+        }
+        .form-group {
+            margin-bottom: 18px;
+        }
+        label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            color: #2d3748;
+            margin-bottom: 6px;
+        }
+        input[type="text"], input[type="email"] {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #cbd5e0;
+            border-radius: 8px;
+            font-size: 14px;
+            box-sizing: border-box;
+            background-color: #fff;
+        }
+        input:focus {
+            outline: none;
+            border-color: #3182ce;
+            box-shadow: 0 0 0 3px rgba(49, 130, 206, 0.1);
+        }
+        small {
+            display: block;
+            color: #718096;
+            font-size: 12px;
+            margin-top: 4px;
+        }
+        button {
+            width: 100%;
+            background-color: #3182ce;
+            color: white;
+            border: none;
+            padding: 14px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 10px;
+            transition: background 0.2s;
+        }
+        button:hover {
+            background-color: #2b6cb0;
+        }
+        .result-box {
+            margin-top: 20px;
+            padding: 14px;
+            background: #f7fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            display: none;
+        }
+        .result-box p {
+            margin: 0 0 8px 0;
+            font-size: 13px;
+            font-weight: 600;
+            color: #2d3748;
+        }
+        .result-box a {
+            color: #3182ce;
+            font-size: 13px;
+            word-break: break-all;
+            text-decoration: none;
+        }
+        .result-box a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="card">
+        <h2>DocPulse</h2>
+        <p class="subtitle">Configuration et génération du lien magique de collecte</p>
+        
+        <form id="adminForm">
+            <div class="form-group">
+                <label>Nom de l'entreprise</label>
+                <input type="text" id="companyName" placeholder="Ex: Alabi SARL" required>
+            </div>
+
+            <div class="form-group">
+                <label>Nom du client</label>
+                <input type="text" id="recipientName" placeholder="Ex: ADJOVI Crévis" required>
+            </div>
+
+            <div class="form-group">
+                <label>E-mail de l'entreprise (où recevoir les documents)</label>
+                <input type="email" id="recipientEmail" placeholder="Ex: contact@entreprise.com" required>
+            </div>
+
+            <div class="form-group">
+                <label>Documents demandés (séparés par des virgules)</label>
+                <input type="text" id="requestedDocs" value="Pièce d'identité (CNI), Contrat signé, Justificatif de domicile, Acte de naissance" required>
+                <small>Le client verra précisément ces champs sur son interface mobile/web.</small>
+            </div>
+
+            <button type="submit">Générer le lien magique</button>
+        </form>
+
+        <div class="result-box" id="resultBox">
+            <p>Lien magique à envoyer au client :</p>
+            <a id="magicLink" href="#" target="_blank"></a>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:5001';
+        const adminForm = document.getElementById('adminForm');
+        const resultBox = document.getElementById('resultBox');
+        const magicLink = document.getElementById('magicLink');
+
+        adminForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const companyName = document.getElementById('companyName').value;
+            const recipientName = document.getElementById('recipientName').value;
+            const recipientEmail = document.getElementById('recipientEmail').value;
+            const requestedDocs = document.getElementById('requestedDocs').value;
+
+            try {
+                const response = await fetch(`${API_URL}/api/requests`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        companyId: companyName, 
+                        recipientName, 
+                        recipientEmail, 
+                        requestedDocs 
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    const link = result.data.magicLink;
+                    magicLink.href = link;
+                    magicLink.textContent = link;
+                    resultBox.style.display = 'block';
+                } else {
+                    alert("Erreur : " + (result.error || "Impossible de générer le lien."));
+                }
+            } catch (err) {
+                console.error(err);
+                alert("Erreur de connexion au serveur backend sur le port 5001.");
+            }
+        });
+    </script>
+</body>
+</html>

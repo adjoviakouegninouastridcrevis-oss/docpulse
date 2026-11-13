@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DocPulse - Espace de Dépôt Client</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f4f6f9;
+            margin: 0;
+            padding: 30px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            box-sizing: border-box;
+        }
+        .card {
+            background: white;
+            padding: 30px;
+            border-radius: 16px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+            width: 100%;
+            max-width: 550px;
+            box-sizing: border-box;
+        }
+        h2 {
+            color: #1a202c;
+            font-size: 24px;
+            margin-bottom: 6px;
+            text-align: center;
+        }
+        p.subtitle {
+            color: #718096;
+            font-size: 14px;
+            text-align: center;
+            margin-bottom: 24px;
+        }
+        .info-box {
+            background: #ebf8ff;
+            border: 1px solid #bee3f8;
+            color: #2b6cb0;
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-size: 13px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .doc-item {
+            background: #f7fafc;
+            border: 1px solid #e2e8f0;
+            padding: 14px;
+            border-radius: 8px;
+            margin-bottom: 14px;
+        }
+        label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            color: #2d3748;
+            margin-bottom: 8px;
+        }
+        input[type="file"] {
+            width: 100%;
+            font-size: 13px;
+            color: #4a5568;
+        }
+        button {
+            width: 100%;
+            background-color: #3182ce;
+            color: white;
+            border: none;
+            padding: 14px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 10px;
+            transition: background 0.2s;
+        }
+        button:hover {
+            background-color: #2b6cb0;
+        }
+        button:disabled {
+            background-color: #cbd5e0;
+            cursor: not-allowed;
+        }
+        .status-message {
+            margin-top: 15px;
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+            font-size: 14px;
+            display: none;
+        }
+        .success {
+            background-color: #def7ec;
+            color: #03543f;
+            border: 1px solid #bcf0da;
+        }
+        .error {
+            background-color: #fde8e8;
+            color: #9b1c1c;
+            border: 1px solid #fbd5d5;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="card">
+        <h2>DocPulse</h2>
+        <p class="subtitle">Transmission sécurisée de documents</p>
+
+        <div class="info-box" id="loadingInfo">
+            Chargement de votre demande en cours...
+        </div>
+
+        <form id="uploadForm" style="display: none;">
+            <div id="dynamicFields">
+                <!-- Les champs de documents s'afficheront dynamiquement ici -->
+            </div>
+
+            <button type="submit" id="submitBtn">Envoyer les documents</button>
+        </form>
+
+        <div id="statusMessage" class="status-message"></div>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:5001';
+        
+        // Récupérer le token depuis l'URL (ex: index.html?token=xyz)
+        const urlParams = new URLSearchParams(window.location.search);
+        const token = urlParams.get('token');
+
+        const loadingInfo = document.getElementById('loadingInfo');
+        const uploadForm = document.getElementById('uploadForm');
+        const dynamicFields = document.getElementById('dynamicFields');
+        const statusMessage = document.getElementById('statusMessage');
+
+        async function initClientPage() {
+            if (!token) {
+                loadingInfo.className = "info-box error";
+                loadingInfo.textContent = "Lien magique invalide ou manquant.";
+                return;
+            }
+
+            try {
+                // Interroger le backend pour récupérer les infos de la demande
+                const response = await fetch(`${API_URL}/api/request/${token}`);
+                const result = await response.json();
+
+                if (result.success) {
+                    const data = result.data;
+                    
+                    loadingInfo.innerHTML = `Demande de <strong>${data.company_id}</strong> pour <strong>${data.recipient_name}</strong>`;
+                    loadingInfo.className = "info-box";
+
+                    // Découper la liste des documents (séparés par des virgules dans template_id)
+                    const docsList = data.template_id ? data.template_id.split(',').map(d => d.trim()) : ["Document général"];
+
+                    // Générer dynamiquement un input file pour chaque document exigé
+                    dynamicFields.innerHTML = '';
+                    docsList.forEach((docName, index) => {
+                        const div = document.createElement('div');
+                        div.className = 'doc-item';
+                        div.innerHTML = `
+                            <label>${docName}</label>
+                            <input type="file" name="file_${index}" data-doctype="${docName}" required>
+                        `;
+                        dynamicFields.appendChild(div);
+                    });
+
+                    uploadForm.style.display = 'block';
+                } else {
+                    loadingInfo.className = "info-box error";
+                    loadingInfo.textContent = result.error || "Ce lien est invalide ou a expiré.";
+                }
+            } catch (err) {
+                console.error(err);
+                loadingInfo.className = "info-box error";
+                loadingInfo.textContent = "Impossible de contacter le serveur backend sur le port 5001.";
+            }
+        }
+
+        // Gestion de l'envoi des documents
+        uploadForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const submitBtn = document.getElementById('submitBtn');
+            submitBtn.disabled = true;
+            submitBtn.textContent = "Envoi en cours...";
+
+            const formData = new FormData();
+            const fileInputs = dynamicFields.querySelectorAll('input[type="file"]');
+
+            // Ajouter tous les fichiers sélectionnés au FormData
+            fileInputs.forEach(input => {
+                if (input.files[0]) {
+                    formData.append('document', input.files[0]);
+                }
+            });
+
+            try {
+                const response = await fetch(`${API_URL}/api/upload/${token}`, {
+                    method: 'POST',
+                    body: formData // Pas de Content-Type en header avec FormData, le navigateur le gère pour les fichiers
+                });
+
+                const result = await response.json();
+
+                statusMessage.style.display = 'block';
+                if (result.success) {
+                    statusMessage.className = "status-message success";
+                    statusMessage.textContent = result.message || "Documents envoyés avec succès à l'entreprise !";
+                    uploadForm.style.display = 'none';
+                } else {
+                    statusMessage.className = "status-message error";
+                    statusMessage.textContent = result.error || "Erreur lors de l'envoi.";
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = "Envoyer les documents";
+                }
+            } catch (err) {
+                console.error(err);
+                statusMessage.style.display = 'block';
+                statusMessage.className = "status-message error";
+                statusMessage.textContent = "Erreur de connexion réseau avec le serveur.";
+                submitBtn.disabled = false;
+                submitBtn.textContent = "Envoyer les documents";
+            }
+        });
+
+        // Lancement au chargement de la page
+        initClientPage();
+    </script>
+</body>
+</html>
