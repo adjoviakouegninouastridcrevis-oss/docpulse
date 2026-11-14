@@ -90,7 +90,8 @@ app.post('/api/requests', async (req: Request, res: Response) => {
         const result = await pool.query(query, values);
 
         const newRequest = result.rows[0];
-        const magicLink = `http://localhost:8080/index.html?token=${newRequest.secure_token}`;
+        cont baseUul = process.env.FRONTEND_URL || 'https://docpulse-bckend.onrender.com';
+        const magicLink = `${baseUrl}/admin.html?token=${newRequest.secure_token}`;
 
         res.status(201).json({
             success: true,
