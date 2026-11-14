@@ -91,7 +91,7 @@ app.post('/api/requests', async (req: Request, res: Response) => {
 
         const newRequest = result.rows[0];
         const baseUrl = process.env.FRONTEND_URL || 'https://docpulse-frontend.onrender.com';
-        const magicLink = `${baseUrl}/admin.html?token=${newRequest.secure_token}`;
+        const magicLink = `${baseUrl}/admin/admin.html?token=${newRequest.secure_token}`;
 
         res.status(201).json({
             success: true,
